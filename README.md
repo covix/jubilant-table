@@ -47,7 +47,7 @@ Script parameters:
 * Query2: ./hbaseApp.sh mode startTS endTS N language outputFolder
       Ex: $ ./hbaseApp.sh 2  1452880040000 1452880110000 6 es,en,it /home/yolanda 
 * Query3: ./hbaseApp.sh mode startTS endTS N outputFolder
-      Ex: $./hbaseApp.sh 3  1452880040000 1452880110000 5 /home/yolanda
+      Ex: $ ./hbaseApp.sh 3  1452880040000 1452880110000 5 /home/yolanda
 
 ```
 ### Steps:
