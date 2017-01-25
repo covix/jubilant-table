@@ -105,7 +105,7 @@ public class hbaseApp {
             //System.out.println("The length is : " + intervalTopTopicList.size());
             for (Map.Entry<String, Long> entry : intervalTopTopicList) {
                 //System.out.println("The result for the first query is:" + "TOPIC: " + entry.getKey() +  " Position: " + position + "Count" + entry.getValue());
-                writeInOutputFile(query, language, position, entry.getKey(), startTimestamp, endTimestamp, bw);
+                writeInOutputFile(language, position, entry.getKey(), startTimestamp, endTimestamp, bw);
                 if (position == nResult)
                     break;
                 else
@@ -143,7 +143,7 @@ public class hbaseApp {
     //     }
     // }
 
-    private static HashMap<String, HashMap<String, Long>> bla(long start_timestamp, long end_timestamp, int N, String[] languages) throws IOException {
+    private static HashMap<String, HashMap<String, Long>> languageWiseQuery(long start_timestamp, long end_timestamp, String[] languages) throws IOException {
         // TODO exclusive?
         Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
         HashMap<String, HashMap<String, Long>> results = new HashMap<>(languages.length);
@@ -180,16 +180,64 @@ public class hbaseApp {
         return results;
     }
 
-    private static void languageQuery(String query, String start_timestamp, String end_timestamp, int n_result, String languages, String outputFolderPath) throws IOException {
+    private static HashMap<String, Long> languageUnwiseQuery(long start_timestamp, long end_timestamp) throws IOException {
+        Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
+        HashMap<String, Long> results = new HashMap<>();
+
+        ResultScanner rs = table.getScanner(scan);
+        Result res = rs.next();
+
+        System.out.println("isEmpty: " + res.isEmpty());
+
+        while (res != null && !res.isEmpty()) {
+            NavigableMap<byte[], NavigableMap<byte[], byte[]>> noVersionMap = res.getNoVersionMap();
+
+            for (byte[] languageBytes : noVersionMap.keySet()) {
+                String language = Bytes.toString(languageBytes);
+
+                System.out.println(language);
+                for (int i = 0; i < N_WORDS; i++) {
+                    // byte[] word_bytes = res.getValue(Bytes.toBytes(language), Bytes.toBytes("word" + i));
+                    // byte[] count_bytes = res.getValue(Bytes.toBytes(language), Bytes.toBytes("freq" + i));
+
+                    byte[] word_bytes = noVersionMap.get(languageBytes).get(Bytes.toBytes("word" + i));
+                    byte[] count_bytes = noVersionMap.get(languageBytes).get(Bytes.toBytes("freq" + i));
+
+                    String word = Bytes.toString(word_bytes);
+                    Long count = Long.parseLong(Bytes.toString(count_bytes));
+
+                    if (results.containsKey(word)) {
+                        results.put(word, results.get(word) + count);
+                    } else {
+                        results.put(word, count);
+                    }
+                }
+            }
+            res = rs.next();
+        }
+        return results;
+    }
+
+    private static void languageQuery(String query, String startTimestamp, String endTimestamp, int nResult, String languages, String outputFolderPath) throws IOException {
         System.out.println("execute query");
 
-        long sts = Long.parseLong(start_timestamp);
-        long ets = Long.parseLong(end_timestamp);
+        long sts = Long.parseLong(startTimestamp);
+        long ets = Long.parseLong(endTimestamp);
 
         String[] langs = languages.split(",");
 
-        HashMap<String, HashMap<String, Long>> results = bla(sts, ets, n_result, langs);
-        arrangeAndPrint(results, query, langs, sts, ets, outputFolderPath, n_result);
+        HashMap<String, HashMap<String, Long>> results = languageWiseQuery(sts, ets, langs);
+        arrangeAndPrint(results, query, langs, sts, ets, outputFolderPath, nResult);
+    }
+
+    private static void thirdQuery(String startTimestamp, String endTimestamp, int nResult, String outputFolderPath) throws IOException {
+        long sts = Long.parseLong(startTimestamp);
+        long ets = Long.parseLong(endTimestamp);
+
+        HashMap<String, HashMap<String, Long>> results = new HashMap<>();
+        results.put("none", languageUnwiseQuery(sts, ets));
+
+        arrangeAndPrint(results, "query3", new String[]{"none"}, sts, ets, outputFolderPath, nResult);
     }
 
     // private static void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
@@ -208,7 +256,7 @@ public class hbaseApp {
     //     arrangeAndPrint(intervalTopTopic, "query3", null, start_timestamp, end_timestamp, outputFolderPath, N);
     // }
 
-    private static String[] extractLangsSource(String dataFolder) {
+    private static String[] extractLanguagesFromSource(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
         assert listOfFiles != null;
@@ -314,11 +362,7 @@ public class hbaseApp {
     }
 
     // TODO opens the file for each line
-    private static void writeInOutputFile(String query, String language, int position, String word, long startTS, long endTS, BufferedWriter bw) throws IOException {
-        if (query.equals("query3")) {
-            language = "none";
-        }
-
+    private static void writeInOutputFile(String language, int position, String word, long startTS, long endTS, BufferedWriter bw) throws IOException {
         String content = language + ", " + position + ", " + word + ", " + startTS + ", " + endTS;
 
         bw.append(content);
@@ -329,23 +373,22 @@ public class hbaseApp {
     private static void start(String[] args, int mode) throws IOException {
 
         if (mode == 4)
-            all_languages = extractLangsSource(args[1]);
+            all_languages = extractLanguagesFromSource(args[1]);
 
         getTable();
         switch (mode) {
             case 1:
                 // System.out.println("First query");
-                languageQuery("query1", args[1], args[2], Integer.parseInt(args[3]), args[4], args[5]);
+                languageQuery("query1", args[2], args[3], Integer.parseInt(args[4]), args[5], args[6]);
                 break;
             case 2:
-                languageQuery("query2", args[1], args[2], Integer.parseInt(args[3]), args[4], args[5]);
+                languageQuery("query2", args[2], args[3], Integer.parseInt(args[4]), args[5], args[6]);
                 break;
             case 3:
-                // thirdQuery(args[1], args[2], Integer.parseInt(args[3]), args[4]);
-                throw new NotImplementedException();
-                // break;
+                thirdQuery(args[2], args[3], Integer.parseInt(args[4]), args[5]);
+                break;
             case 4:
-                load(args[1]);
+                load(args[2]);
                 break;
         }
     }
@@ -357,15 +400,15 @@ public class hbaseApp {
             int mode = 0;
             System.out.println("Started hbaseApp with mode: " + args[0]);
             mode = Integer.parseInt(args[0]);
-            if (mode == 4 && args.length < 2) {
+            if (mode == 4 && args.length != 3) {
                 System.out.println("To start the App with mode 4 it is required the mode and the dataFolder");
                 System.exit(1);
             }
-            if ((mode == 1 || mode == 2) && args.length != 6) {
+            if ((mode == 1 || mode == 2) && args.length != 7) {
                 System.out.println("To start the App with mode " + mode + " it is required the mode startTS endTS N language outputFolder");
                 System.exit(1);
             }
-            if (mode == 3 && args.length != 5) {
+            if (mode == 3 && args.length != 6) {
                 System.out.println("To start the App with mode 1 it is required the mode startTS endTS N outputFolder");
                 System.exit(1);
             }
