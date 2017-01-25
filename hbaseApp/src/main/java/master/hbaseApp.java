@@ -73,22 +73,47 @@ public class hbaseApp {
         return list;
     }
 
-    private static void arrangeAndPrint(Map<String, HashMap<String, Long>> intervalTopTopicLangs, String query, String[] languages, long start_timestamp, long end_timestamp, String output_folder, int N) throws IOException {
+    // private static List<Entry<String, Long>> getTopN(Map<String, Long> map, int n_result) {
+    //     throw new NotImplementedException();
+    //
+    //     // TODO check storm
+    //     for (int i = 0; i < n_result; i++) {
+    //         String word = "";
+    //         Long count = 0L;
+    //
+    //         for (Map.Entry<String, Long> wordEntry : intervalTopTopic.entrySet()) {
+    //             if (wordEntry.getValue() > count) {
+    //                 // count =
+    //             }
+    //         }
+    //
+    //         // check duplicates
+    //     }
+    //
+    // }
+
+    private static void arrangeAndPrint(Map<String, HashMap<String, Long>> intervalTopTopicLangs, String query, String[] languages, long startTimestamp, long endTimestamp, String outputFolder, int nResult) throws IOException {
+        File file = new File(outputFolder + "/" + ID + "_" + query + ".out");
+        BufferedWriter bw = new BufferedWriter(new FileWriter(file, true));
+
         for (String language : languages) {
             Map<String, Long> intervalTopTopic = intervalTopTopicLangs.get(language);
+
             // Process the results and print them
             List<Entry<String, Long>> intervalTopTopicList = arrangeMap(intervalTopTopic);
             int position = 1;
             //System.out.println("The length is : " + intervalTopTopicList.size());
             for (Map.Entry<String, Long> entry : intervalTopTopicList) {
                 //System.out.println("The result for the first query is:" + "TOPIC: " + entry.getKey() +  " Position: " + position + "Count" + entry.getValue());
-                writeInOutputFile(query, language, position, entry.getKey(), start_timestamp, end_timestamp, output_folder, entry.getValue().toString());
-                if (position == N)
+                writeInOutputFile(query, language, position, entry.getKey(), startTimestamp, endTimestamp, bw);
+                if (position == nResult)
                     break;
                 else
                     position++;
             }
         }
+
+        bw.close();
     }
 
     // private static void executeQuery(String query, long start_timestamp, long end_timestamp, int N, String lang, String outputFolderPath) {
@@ -118,7 +143,7 @@ public class hbaseApp {
     //     }
     // }
 
-    private static HashMap<String, HashMap<String, Long>> bla(long start_timestamp, long end_timestamp, int N, String[] languages, String outputFolderPath) throws IOException {
+    private static HashMap<String, HashMap<String, Long>> bla(long start_timestamp, long end_timestamp, int N, String[] languages) throws IOException {
         // TODO exclusive?
         Scan scan = new Scan(generateKey(start_timestamp), generateKey(end_timestamp));
         HashMap<String, HashMap<String, Long>> results = new HashMap<>(languages.length);
@@ -155,7 +180,7 @@ public class hbaseApp {
         return results;
     }
 
-    private static void languageQuery(String query, String start_timestamp, String end_timestamp, int N, String languages, String outputFolderPath) throws IOException {
+    private static void languageQuery(String query, String start_timestamp, String end_timestamp, int n_result, String languages, String outputFolderPath) throws IOException {
         System.out.println("execute query");
 
         long sts = Long.parseLong(start_timestamp);
@@ -163,19 +188,9 @@ public class hbaseApp {
 
         String[] langs = languages.split(",");
 
-        HashMap<String, HashMap<String, Long>> results = bla(sts, ets, N, langs, outputFolderPath);
-        arrangeAndPrint(results, query, langs, sts, ets, outputFolderPath, N);
+        HashMap<String, HashMap<String, Long>> results = bla(sts, ets, n_result, langs);
+        arrangeAndPrint(results, query, langs, sts, ets, outputFolderPath, n_result);
     }
-
-    // private static void secondQuery(String start_timestamp, String end_timestamp, int N, String languages, String outputFolderPath) throws IOException {
-    //     System.out.println("execute query");
-    //     // executeQuery("query1", start_timestamp, end_timestamp, N, language, outputFolderPath);
-    //     long sts = Long.parseLong(start_timestamp);
-    //     long ets = Long.parseLong(end_timestamp);
-    //     String[] languages = {language};
-    //     HashMap<String, HashMap<String, Long>> results = bla(sts, ets, N, languages, outputFolderPath);
-    //     arrangeAndPrint(results, "query1", languages, sts, ets, outputFolderPath, N);
-    // }
 
     // private static void thirdQuery(String start_timestamp, String end_timestamp, int N, String outputFolderPath) {
     //     //System.out.println("Executing the query3");
@@ -299,19 +314,15 @@ public class hbaseApp {
     }
 
     // TODO opens the file for each line
-    private static void writeInOutputFile(String query, String language, int position, String word, long startTS, long endTS, String outputFolderPath, String frequency) throws IOException {
-        File file = new File(outputFolderPath + "/" + ID + "_" + query + ".out");
-
-        if (query.equals("query3"))
+    private static void writeInOutputFile(String query, String language, int position, String word, long startTS, long endTS, BufferedWriter bw) throws IOException {
+        if (query.equals("query3")) {
             language = "none";
+        }
 
-        String content = language + "," + position + "," + word + "," + startTS + "," + endTS;
+        String content = language + ", " + position + ", " + word + ", " + startTS + ", " + endTS;
 
-        BufferedWriter bw = null;
-        bw = new BufferedWriter(new FileWriter(file, true));
         bw.append(content);
         bw.newLine();
-        bw.close();
         // System.out.println("Write done");
     }
 
