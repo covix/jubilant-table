@@ -8,9 +8,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.Collator;
 import java.util.*;
-import java.util.Map.Entry;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -142,9 +140,6 @@ public class hbaseApp {
             NavigableMap<byte[], NavigableMap<byte[], byte[]>> noVersionMap = res.getNoVersionMap();
 
             for (byte[] languageBytes : noVersionMap.keySet()) {
-                String language = Bytes.toString(languageBytes);
-
-                // System.out.println(language);
                 for (int i = 0; i < N_WORDS; i++) {
                     byte[] word_bytes = noVersionMap.get(languageBytes).get(Bytes.toBytes("word" + i));
                     byte[] count_bytes = noVersionMap.get(languageBytes).get(Bytes.toBytes("freq" + i));
@@ -186,7 +181,6 @@ public class hbaseApp {
         arrangeAndPrint(results, "query3", new String[]{"none"}, sts, ets, outputFolderPath, nResult);
     }
 
-
     private static String[] extractLanguagesFromSource(String dataFolder) {
         File folder = new File(dataFolder);
         File[] listOfFiles = folder.listFiles();
@@ -202,21 +196,17 @@ public class hbaseApp {
         return languages;
     }
 
-    private static void getTable() throws IOException {
-        // TODO uncomment
-        // System.setProperty("hadoop.home.dir", "/");
-        Configuration conf = HBaseConfiguration.create(); // Instantiating configuration class
+    private static void getTable(String zkHost) throws IOException {
+        String[] zkHostSplitted = zkHost.split(":");
 
-        // TODO what's this?
-        // conf.set("hbase.zookeeper.quorum", "node4");
-
-
-        //conf.addResource(new Path("/home/masteruser1/hbase-0.98.16.1-hadoop2/conf/hbase-site.xml"));
+        Configuration conf = HBaseConfiguration.create();
+        conf.set("hbase.zookeeper.quorum", zkHostSplitted[0]);
+        conf.set("hbase.zookeeper.property.clientPort", zkHostSplitted[1]);
 
         HBaseAdmin admin = new HBaseAdmin(conf);
         // System.out.println("Table exist: " + admin.tableExists(HTABLE_NAME));
         if (!admin.tableExists(HTABLE_NAME)) {
-            System.out.println("Creating table in hbase");
+            // System.out.println("Creating table in hbase");
             // Instantiating table descriptor class
             HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(HTABLE_NAME));
             // System.out.println("table descriptor");
@@ -301,14 +291,12 @@ public class hbaseApp {
     }
 
     private static void start(String[] args, int mode) throws IOException {
-
         if (mode == 4)
-            all_languages = extractLanguagesFromSource(args[1]);
+            all_languages = extractLanguagesFromSource(args[2]);
 
-        getTable();
+        getTable(args[1]);
         switch (mode) {
             case 1:
-                // System.out.println("First query");
                 languageQuery("query1", args[2], args[3], Integer.parseInt(args[4]), args[5], args[6]);
                 break;
             case 2:
@@ -324,12 +312,11 @@ public class hbaseApp {
     }
 
     public static void main(String[] args) throws Exception {
-        // TODO zookeper argument
         org.apache.log4j.BasicConfigurator.configure();
         if (args.length > 0) {
-            int mode = 0;
-            System.out.println("Started hbaseApp with mode: " + args[0]);
-            mode = Integer.parseInt(args[0]);
+            int mode = Integer.parseInt(args[0]);
+            // System.out.println("Started hbaseApp with mode: " + mode);
+
             if (mode == 4 && args.length != 3) {
                 System.out.println("To start the App with mode 4 it is required the mode and the dataFolder");
                 System.exit(1);
